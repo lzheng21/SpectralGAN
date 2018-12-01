@@ -5,9 +5,9 @@ import multiprocessing
 import pickle
 import numpy as np
 import tensorflow as tf
-import config
-import generator
-import discriminator
+from src import config
+from src import generator
+from src import discriminator
 from src import utils
 from src.evaluation import link_prediction as lp
 
