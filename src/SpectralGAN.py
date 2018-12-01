@@ -12,6 +12,7 @@ from src import utils
 import random
 from src import load_data
 from src import utils
+from src import test
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -89,7 +90,7 @@ class SpectralGAN(object):
                                            self.generator.reward: np.array(reward)})
 
 
-            self.evaluation(self)
+            test.test(sess=self.sess, model=self.generator, users_to_test=data.test_set.keys())
         print("training completes")
 
     def prepare_data_for_d(self):
@@ -156,12 +157,6 @@ class SpectralGAN(object):
         if self_connection:
             return np.identity(self.n_users + self.n_items, dtype=np.float32) + A
         return A
-
-    @staticmethod
-    def evaluation(self):
-        all_score = self.sess.run(self.generator.all_score)
-
-
 
 
 if __name__ == "__main__":
