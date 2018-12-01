@@ -62,7 +62,12 @@ def test(sess, model, users_to_test):
     test_users = users_to_test
     test_user_num = len(test_users)
 
-    user_batch_rating = sess.run(model.all_score)
+    A = np.zeros([data.n_users + data.n_items, data.n_users + data.n_items], dtype=np.float32)
+    A[:data.n_users, data.n_users:] = data.R
+    A[data.n_users:, :data.n_users] = data.R.T
+    A = np.identity(data.n_users + data.n_items, dtype=np.float32) + A
+
+    user_batch_rating = sess.run(model.all_score, feed_dict={model.adj_miss: np.array([A] * config.batch_size_gen)})
     user_batch_rating_uid = zip(user_batch_rating, test_users)
     batch_result = pool.map(test_one_user, user_batch_rating_uid)
 

@@ -1,14 +1,9 @@
 import os
-import collections
-import tqdm
-import multiprocessing
-import pickle
 import numpy as np
 import tensorflow as tf
 from src import config
 from src import generator
 from src import discriminator
-from src import utils
 import random
 from src import load_data
 from src import utils
@@ -53,8 +48,6 @@ class SpectralGAN(object):
 
     def train(self):
 
-        self.evaluation(self)
-
         print("start training...")
         for epoch in range(config.n_epochs):
             print("epoch %d" % epoch)
@@ -90,7 +83,11 @@ class SpectralGAN(object):
                                            self.generator.reward: np.array(reward)})
 
 
-            test.test(sess=self.sess, model=self.generator, users_to_test=data.test_set.keys())
+            ret = test.test(sess=self.sess, model=self.generator, users_to_test=data.test_set.keys())
+            print('recall_20 %f recall_40 %f recall_60 %f recall_80 %f recall_100 %f'
+                  % (ret[0], ret[1], ret[2], ret[3], ret[4]))
+            print('map_20 %f map_40 %f map_60 %f map_80 %f map_100 %f'
+                  % (ret[5], ret[6], ret[7], ret[8], ret[9]))
         print("training completes")
 
     def prepare_data_for_d(self):
@@ -99,37 +96,46 @@ class SpectralGAN(object):
         node_1 = []
         node_2 = []
         labels = []
-        for u in random.sample(range(self.n_users), config.batch_size_dis/2):
+        users = random.sample(range(self.n_users), int(config.batch_size_dis/2))
+        for u in users:
             pos_items = set(np.nonzero(self.R[u, :])[0].tolist())
-            neg_items = set(range(self.n_items)) - pos_items
-
-            pos_item = random.choice(pos_items)
+            pos_item = random.sample(pos_items, 1)[0]
             R_missing = self.R
             R_missing[u, pos_item] = 0
             adj_missing = self.adj_mat(R=R_missing)
-            adj_mats.append(adj_missing)
 
+            adj_mats.append(adj_missing)
             node_1.append(u)
             node_2.append(self.n_users + pos_item)
             labels.append(1.0)
 
+        adj_mats = adj_mats * 2
+        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: np.array(adj_mats)})
+        for u in users:
+            pos_items = set(np.nonzero(self.R[u, :])[0].tolist())
+            neg_items = list(set(range(self.n_items)) - pos_items)
+
+            relevance_probability = all_score[u, neg_items]
+            relevance_probability = utils.softmax(relevance_probability)
+            neg_item = np.random.choice(neg_items, size=1, p=relevance_probability)[0]  # select next node
+
             node_1.append(u)
-            neg_item = random.choice(neg_items)
             node_2.append(self.n_users + neg_item)
             labels.append(0.0)
+
 
         return adj_mats, node_1, node_2, labels
 
     def prepare_data_for_g(self):
         """sample nodes for the generator"""
-        all_score = self.sess.run(self.generator.all_score)
+
         adj_mats = []
         node_1 = []
         node_2 = []
         for u in random.sample(range(self.n_users), config.batch_size_gen):
             pos_items = set(np.nonzero(self.R[u,:])[0].tolist())
             neg_items = set(range(self.n_items)) - pos_items
-            pos_item = random.choice(pos_items)
+            pos_item = random.sample(pos_items, 1)[0]
 
             R_missing = self.R
             R_missing[u, pos_item] = 0
@@ -137,6 +143,10 @@ class SpectralGAN(object):
             adj_mats.append(adj_missing)
             node_1.append(u)
 
+        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: np.array(adj_mats)})
+        for u in node_1:
+            pos_items = set(np.nonzero(self.R[u, :])[0].tolist())
+            neg_items = list(set(range(self.n_items)) - pos_items)
             relevance_probability = all_score[u, neg_items]
             relevance_probability = utils.softmax(relevance_probability)
             neg_item = np.random.choice(neg_items, size=1, p=relevance_probability)[0]  # select next node
@@ -161,5 +171,5 @@ class SpectralGAN(object):
 
 if __name__ == "__main__":
     data = load_data.Data(train_file=config.train_filename, test_file=config.test_filename)
-    graph_gan = SpectralGAN(n_users=data.n_users, n_items=data.n_items, R=data.R)
-    graph_gan.train()
+    spectral_gan = SpectralGAN(n_users=data.n_users, n_items=data.n_items, R=data.R)
+    spectral_gan.train()

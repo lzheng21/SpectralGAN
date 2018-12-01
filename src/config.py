@@ -1,8 +1,8 @@
 modes = ["gen", "dis"]
 
 # training settings
-batch_size_gen = 64  # batch size for the generator
-batch_size_dis = 64  # batch size for the discriminator
+batch_size_gen = 4  # batch size for the generator
+batch_size_dis = 4  # batch size for the discriminator
 lambda_gen = 1e-5  # l2 loss regulation weight for the generator
 lambda_dis = 1e-5  # l2 loss regulation weight for the discriminator
 n_sample_gen = 20  # number of samples for the generator
