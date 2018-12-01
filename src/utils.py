@@ -89,3 +89,7 @@ def F1(pre, rec):
         return (2.0 * pre * rec) / (pre + rec)
     else:
         return 0.
+
+def softmax(x):
+    e_x = np.exp(x - np.max(x))  # for computation stability
+    return e_x / e_x.sum()

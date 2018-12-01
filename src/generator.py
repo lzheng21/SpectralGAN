@@ -1,28 +1,37 @@
 import tensorflow as tf
-import config
-
+from src import config
 
 class Generator(object):
-    def __init__(self, n_node, node_emd_init):
+    def __init__(self, n_node, n_layer):
         self.n_node = n_node
-        self.node_emd_init = node_emd_init
 
         with tf.variable_scope('generator'):
-            self.embedding_matrix = tf.get_variable(name="embedding",
-                                                    shape=self.node_emd_init.shape,
-                                                    initializer=tf.constant_initializer(self.node_emd_init),
-                                                    trainable=True)
-            self.bias_vector = tf.Variable(tf.zeros([self.n_node]))
+            self.embedding_matrix = tf.Variable(tf.random_normal([self.n_node, config.emb_dim],
+                                                                 mean=0.01, stddev=0.02, dtype=tf.float32),
+                                                                 name='features')
 
-        self.node_id = tf.placeholder(tf.int32, shape=[None])
-        self.node_neighbor_id = tf.placeholder(tf.int32, shape=[None])
-        self.reward = tf.placeholder(tf.float32, shape=[None])
+            self.weight_matrix = tf.Variable(tf.random_normal([n_layer, self.emb_dim, config.emb_dim],
+                                                               mean=0.01, stddev=0.02, dtype=tf.float32),
+                                                               name='weight')
 
-        self.all_score = tf.matmul(self.embedding_matrix, self.embedding_matrix, transpose_b=True) + self.bias_vector
+        self.adj_miss = tf.placeholder(tf.int32, shape=[config.batch_size_gen, n_node, n_node])
+        self.node_id = tf.placeholder(tf.int32, shape=[config.batch_size_gen])
+        self.node_neighbor_id = tf.placeholder(tf.int32, shape=[config.batch_size_gen])
+        self.reward = tf.placeholder(tf.float32, shape=[config.batch_size_gen])
+
+        for b in range(config.batch_size_gen):
+            adj_miss = tf.gather(self.adj_miss, b)
+            degree = tf.reciprocal(tf.reduce_sum(adj_miss, axis=1))
+            for l in range(n_layer):
+                weight_for_l = tf.gather(self.weight_matrix, l)
+                self.embedding_matrix = tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
+                                                        self.embedding_matrix),
+                                                  weight_for_l)
+
+        self.all_score = tf.matmul(self.embedding_matrix, self.embedding_matrix, transpose_b=True)
         self.node_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_id)  # batch_size * n_embed
         self.node_neighbor_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_neighbor_id)
-        self.bias = tf.gather(self.bias_vector, self.node_neighbor_id)
-        self.score = tf.reduce_sum(self.node_embedding * self.node_neighbor_embedding, axis=1) + self.bias
+        self.score = tf.reduce_sum(self.node_embedding * self.node_neighbor_embedding, axis=1)
         self.prob = tf.clip_by_value(tf.nn.sigmoid(self.score), 1e-5, 1)
 
         self.loss = -tf.reduce_mean(tf.log(self.prob) * self.reward) + config.lambda_gen * (
