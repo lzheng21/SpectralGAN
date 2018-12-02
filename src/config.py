@@ -1,18 +1,18 @@
 modes = ["gen", "dis"]
 
 # training settings
-batch_size_gen = 4  # batch size for the generator
-batch_size_dis = 4  # batch size for the discriminator
+batch_size_gen = 8  # batch size for the generator
+batch_size_dis = 8  # batch size for the discriminator
 lambda_gen = 1e-5  # l2 loss regulation weight for the generator
 lambda_dis = 1e-5  # l2 loss regulation weight for the discriminator
-n_sample_gen = 20  # number of samples for the generator
+n_sample_gen = 40  # number of samples for the generator
 lr_gen = 1e-3  # learning rate for the generator
 lr_dis = 1e-3  # learning rate for the discriminator
 n_epochs = 20  # number of outer loops
 n_epochs_gen = 30  # number of inner loops for the generator
 n_epochs_dis = 30  # number of inner loops for the discriminator
-gen_interval = n_epochs_gen  # sample new nodes for the generator for every gen_interval iterations
-dis_interval = n_epochs_dis  # sample new nodes for the discriminator for every dis_interval iterations
+gen_interval = n_epochs_gen/5  # sample new nodes for the generator for every gen_interval iterations
+dis_interval = n_epochs_dis/5  # sample new nodes for the discriminator for every dis_interval iterations
 update_ratio = 1    # updating ratio when choose the trees
 
 # model saving

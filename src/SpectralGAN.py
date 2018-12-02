@@ -38,13 +38,13 @@ class SpectralGAN(object):
         """initializing the generator"""
 
         with tf.variable_scope("generator"):
-            self.generator = generator.Generator(n_node=self.n_node, n_layer=1)
+            self.generator = generator.Generator(n_node=self.n_node, n_layer=3)
 
     def build_discriminator(self):
         """initializing the discriminator"""
 
         with tf.variable_scope("discriminator"):
-            self.discriminator = discriminator.Discriminator(n_node=self.n_node, n_layer=1)
+            self.discriminator = discriminator.Discriminator(n_node=self.n_node, n_layer=3)
 
     def train(self):
 
@@ -81,7 +81,6 @@ class SpectralGAN(object):
                                            self.generator.node_id: np.array(node_1),
                                            self.generator.node_neighbor_id: np.array(node_2),
                                            self.generator.reward: np.array(reward)})
-
 
             ret = test.test(sess=self.sess, model=self.generator, users_to_test=data.test_set.keys())
             print('recall_20 %f recall_40 %f recall_60 %f recall_80 %f recall_100 %f'

@@ -22,25 +22,26 @@ class Discriminator(object):
         self.label = tf.placeholder(tf.float32, shape=[config.batch_size_gen])
 
         losses = []
-        for b in range(config.batch_size_gen):
+        for b in range(config.batch_size_dis):
             adj_miss = tf.cast(tf.gather(self.adj_miss, b), tf.float32)
             degree = tf.diag(tf.reciprocal(tf.reduce_sum(adj_miss, axis=1)))
             for l in range(n_layer):
                 weight_for_l = tf.gather(self.weight_matrix, l)
-                self.embedding_matrix = tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
+                self.embedding_matrix = tf.nn.relu(tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
                                                         self.embedding_matrix),
-                                                  weight_for_l)
+                                                   weight_for_l))
 
-            self.node_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_id)
-            self.node_neighbor_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_neighbor_id)
-            self.score = tf.reduce_sum(tf.multiply(self.node_embedding, self.node_neighbor_embedding), axis=1)
+        self.node_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_id)
+        self.node_neighbor_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_neighbor_id)
+        self.score = tf.reduce_sum(tf.multiply(self.node_embedding, self.node_neighbor_embedding), axis=1)
 
-            self.loss = tf.reduce_sum(
+
+        self.loss = tf.reduce_sum(
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=self.label, logits=self.score)) + config.lambda_dis * (
                 tf.nn.l2_loss(self.node_neighbor_embedding) +
                 tf.nn.l2_loss(self.node_embedding))
-            losses.append(self.loss)
+
         optimizer = tf.train.AdamOptimizer(config.lr_dis)
-        self.d_updates = optimizer.minimize(tf.reduce_mean(losses))
+        self.d_updates = optimizer.minimize(tf.reduce_mean(self.loss))
         self.score = tf.clip_by_value(self.score, clip_value_min=-10, clip_value_max=10)
         self.reward = tf.log(1 + tf.exp(self.score))
