@@ -2,11 +2,11 @@
 from src import load_data
 from src import config
 from src import utils
+from src.SpectralGAN import data
 import numpy as np
 import multiprocessing
 cores = multiprocessing.cpu_count()
 
-data = load_data.Data(train_file=config.train_filename, test_file=config.test_filename)
 USER_NUM, ITEM_NUM = data.n_users, data.n_items
 
 

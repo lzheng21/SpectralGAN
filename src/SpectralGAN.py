@@ -10,6 +10,7 @@ from src import utils
 from src import test
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+data = load_data.Data(train_file=config.train_filename, test_file=config.test_filename)
 
 
 class SpectralGAN(object):
@@ -36,13 +37,13 @@ class SpectralGAN(object):
         """initializing the generator"""
 
         with tf.variable_scope("generator"):
-            self.generator = generator.Generator(n_node=self.n_node, n_layer=0)
+            self.generator = generator.Generator(n_node=self.n_node, n_layer=config.n_layers)
 
     def build_discriminator(self):
         """initializing the discriminator"""
 
         with tf.variable_scope("discriminator"):
-            self.discriminator = discriminator.Discriminator(n_node=self.n_node, n_layer=0)
+            self.discriminator = discriminator.Discriminator(n_node=self.n_node, n_layer=config.n_layers)
 
     def train(self):
 
@@ -140,7 +141,7 @@ class SpectralGAN(object):
             relevance_probability = all_score[u, neg_items]
             relevance_probability = utils.softmax(relevance_probability)
             neg_item = np.random.choice(neg_items, size=1, p=relevance_probability)[0]  # select next node
-            negative_items.append(neg_item)
+            negative_items.append(data.n_users + neg_item)
 
         node_1 = users*2
         node_2 = negative_items*2
@@ -161,6 +162,5 @@ class SpectralGAN(object):
 
 
 if __name__ == "__main__":
-    data = load_data.Data(train_file=config.train_filename, test_file=config.test_filename)
     spectral_gan = SpectralGAN(n_users=data.n_users, n_items=data.n_items, R=data.R)
     spectral_gan.train()

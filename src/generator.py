@@ -1,6 +1,7 @@
 import tensorflow as tf
 from src import config
-
+from src import test
+from src.SpectralGAN import data
 class Generator(object):
     def __init__(self, n_node, n_layer):
         self.n_node = n_node
@@ -37,8 +38,8 @@ class Generator(object):
         self.loss = -tf.reduce_mean(tf.log(self.prob) * self.reward) + config.lambda_gen * (
                     tf.nn.l2_loss(self.node_neighbor_embedding) + tf.nn.l2_loss(self.node_embedding))
 
-
-        self.all_score = tf.matmul(self.embedding_matrix, self.embedding_matrix, transpose_b=True)
+        user_embeddings, item_embeddings = tf.split(self.embedding_matrix, [data.n_users, data.n_items])
+        self.all_score = tf.matmul(user_embeddings, item_embeddings, transpose_b=True)
 
         optimizer = tf.train.AdamOptimizer(config.lr_gen)
         self.g_updates = optimizer.minimize(tf.reduce_mean(self.loss))
