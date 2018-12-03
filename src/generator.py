@@ -14,27 +14,25 @@ class Generator(object):
                                                                mean=0.01, stddev=0.02, dtype=tf.float32),
                                                                name='weight')
 
-        self.adj_miss = tf.placeholder(tf.int32, shape=[config.batch_size_gen, n_node, n_node])
-        self.node_id = tf.placeholder(tf.int32, shape=[config.batch_size_gen])
-        self.node_neighbor_id = tf.placeholder(tf.int32, shape=[config.batch_size_gen])
-        self.reward = tf.placeholder(tf.float32, shape=[config.batch_size_gen])
+        self.adj_miss = tf.placeholder(tf.int32, shape=[n_node, n_node])
+        self.node_id = tf.placeholder(tf.int32, shape=[config.missing_edge])
+        self.node_neighbor_id = tf.placeholder(tf.int32, shape=[config.missing_edge])
+        self.reward = tf.placeholder(tf.float32, shape=[config.missing_edge])
 
-        losses = []
-        for b in range(config.batch_size_gen):
-            adj_miss = tf.cast(tf.gather(self.adj_miss, b), tf.float32)
-            degree = tf.diag(tf.reciprocal(tf.reduce_sum(adj_miss, axis=1)))
-            for l in range(n_layer):
-                weight_for_l = tf.gather(self.weight_matrix, l)
-                self.embedding_matrix = tf.nn.relu(tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
+        adj_miss = tf.cast(self.adj_miss, tf.float32)
+        degree = tf.diag(tf.reciprocal(tf.reduce_sum(adj_miss, axis=1)))
+        for l in range(n_layer):
+            weight_for_l = tf.gather(self.weight_matrix, l)
+            self.embedding_matrix = tf.nn.leaky_relu(tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
                                                         self.embedding_matrix),
                                                    weight_for_l))
 
         self.node_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_id)  # batch_size * n_embed
 
-        self.node_neighbor_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_neighbor_id)
+        self.node_neighbor_embedding = tf.nn.embedding_lookup(self.embedding_matrix,
+                                                              self.node_neighbor_id)
         self.score = tf.reduce_sum(self.node_embedding * self.node_neighbor_embedding, axis=1)
         self.prob = tf.clip_by_value(tf.nn.sigmoid(self.score), 1e-5, 1)
-
 
         self.loss = -tf.reduce_mean(tf.log(self.prob) * self.reward) + config.lambda_gen * (
                     tf.nn.l2_loss(self.node_neighbor_embedding) + tf.nn.l2_loss(self.node_embedding))

@@ -17,8 +17,6 @@ class SpectralGAN(object):
         print("reading graphs...")
         self.n_users, self.n_items = n_users, n_items
         self.n_node = n_users + n_items
-        self.R = R
-
         # construct graph
         self.R = R
 
@@ -38,13 +36,13 @@ class SpectralGAN(object):
         """initializing the generator"""
 
         with tf.variable_scope("generator"):
-            self.generator = generator.Generator(n_node=self.n_node, n_layer=3)
+            self.generator = generator.Generator(n_node=self.n_node, n_layer=0)
 
     def build_discriminator(self):
         """initializing the discriminator"""
 
         with tf.variable_scope("discriminator"):
-            self.discriminator = discriminator.Discriminator(n_node=self.n_node, n_layer=3)
+            self.discriminator = discriminator.Discriminator(n_node=self.n_node, n_layer=0)
 
     def train(self):
 
@@ -91,72 +89,66 @@ class SpectralGAN(object):
 
     def prepare_data_for_d(self):
         """generate positive and negative samples for the discriminator, and record them in the txt file"""
-        adj_mats = []
-        node_1 = []
-        node_2 = []
-        labels = []
-        users = random.sample(range(self.n_users), int(config.batch_size_dis/2))
-        for u in users:
-            pos_items = set(np.nonzero(self.R[u, :])[0].tolist())
-            pos_item = random.sample(pos_items, 1)[0]
-            R_missing = self.R
-            R_missing[u, pos_item] = 0
-            adj_missing = self.adj_mat(R=R_missing)
+        users = random.sample(range(self.n_users), config.missing_edge)
 
-            adj_mats.append(adj_missing)
-            node_1.append(u)
-            node_2.append(self.n_users + pos_item)
-            labels.append(1.0)
-
-        adj_mats = adj_mats * 2
-        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: np.array(adj_mats)})
+        R_missing = np.copy(self.R)
+        pos_items = []
         for u in users:
-            pos_items = set(np.nonzero(self.R[u, :])[0].tolist())
-            neg_items = list(set(range(self.n_items)) - pos_items)
+            p_items = set(np.nonzero(self.R[u, :])[0].tolist())
+            p_item = random.sample(p_items, 1)[0]
+            R_missing[u, p_item] = 0
+            pos_items.append(p_item)
+
+        adj_missing = self.adj_mat(R=R_missing)
+        node_2 = [self.n_users + p for p in pos_items]
+
+
+        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: adj_missing})
+        negative_items = []
+        for u in users:
+            neg_items = list(set(range(self.n_items)) - set(np.nonzero(self.R[u, :])[0].tolist()))
 
             relevance_probability = all_score[u, neg_items]
             relevance_probability = utils.softmax(relevance_probability)
             neg_item = np.random.choice(neg_items, size=1, p=relevance_probability)[0]  # select next node
+            negative_items.append(neg_item)
 
-            node_1.append(u)
-            node_2.append(self.n_users + neg_item)
-            labels.append(0.0)
+        node_2 += [self.n_users + p for p in negative_items]
+        node_1 = users*2
+        labels = [1.0]*config.missing_edge + [0.0] * config.missing_edge
 
-
-        return adj_mats, node_1, node_2, labels
+        return adj_missing, node_1, node_2, labels
 
     def prepare_data_for_g(self):
         """sample nodes for the generator"""
+        users = random.sample(range(self.n_users), config.missing_edge)
 
-        adj_mats = []
-        node_1 = []
-        node_2 = []
-        for u in random.sample(range(self.n_users), config.batch_size_gen):
+        R_missing = np.copy(self.R)
+        for u in users:
             pos_items = set(np.nonzero(self.R[u,:])[0].tolist())
-            neg_items = set(range(self.n_items)) - pos_items
             pos_item = random.sample(pos_items, 1)[0]
-
-            R_missing = self.R
             R_missing[u, pos_item] = 0
-            adj_missing = self.adj_mat(R=R_missing)
-            adj_mats.append(adj_missing)
-            node_1.append(u)
 
-        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: np.array(adj_mats)})
-        for u in node_1:
+        adj_missing = self.adj_mat(R=R_missing)
+
+        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: adj_missing})
+
+        negative_items = []
+        for u in users:
             pos_items = set(np.nonzero(self.R[u, :])[0].tolist())
             neg_items = list(set(range(self.n_items)) - pos_items)
             relevance_probability = all_score[u, neg_items]
             relevance_probability = utils.softmax(relevance_probability)
             neg_item = np.random.choice(neg_items, size=1, p=relevance_probability)[0]  # select next node
-            node_2.append(self.n_users+neg_item)
+            negative_items.append(neg_item)
 
-
+        node_1 = users*2
+        node_2 = negative_items*2
         reward = self.sess.run(self.discriminator.reward,
-                               feed_dict={self.discriminator.adj_miss: np.array(adj_mats),
+                               feed_dict={self.discriminator.adj_miss: adj_missing,
                                           self.discriminator.node_id: np.array(node_1),
                                           self.discriminator.node_neighbor_id: np.array(node_2)})
-        return adj_mats, node_1, node_2, reward
+        return adj_missing, node_1[:config.missing_edge], node_2[:config.missing_edge], reward[:config.missing_edge]
 
 
     def adj_mat(self, R, self_connection=True):
