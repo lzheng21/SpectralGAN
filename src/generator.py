@@ -24,7 +24,7 @@ class Generator(object):
         degree = tf.diag(tf.reciprocal(tf.reduce_sum(adj_miss, axis=1)))
         for l in range(n_layer):
             weight_for_l = tf.gather(self.weight_matrix, l)
-            self.embedding_matrix = tf.nn.leaky_relu(tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
+            self.embedding_matrix = tf.nn.sigmoid1(tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
                                                         self.embedding_matrix),
                                                    weight_for_l))
 
