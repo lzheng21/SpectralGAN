@@ -5,6 +5,8 @@ from src import utils
 from src.SpectralGAN import data
 import numpy as np
 import multiprocessing
+from scipy.sparse import linalg
+
 cores = multiprocessing.cpu_count()
 
 USER_NUM, ITEM_NUM = data.n_users, data.n_items
@@ -66,8 +68,10 @@ def test(sess, model, users_to_test):
     A[:data.n_users, data.n_users:] = data.R
     A[data.n_users:, :data.n_users] = data.R.T
     A = np.identity(data.n_users + data.n_items, dtype=np.float32) + A
+    eigenvalues, eigenvectors = linalg.eigs(A, k=config.n_eigs)
 
-    user_batch_rating = sess.run(model.all_score, feed_dict={model.adj_miss: A})
+    user_batch_rating = sess.run(model.all_score, feed_dict={model.eigen_vectors: eigenvectors,
+                                                             model.eigen_values: eigenvalues})
     user_batch_rating_uid = zip(user_batch_rating, test_users)
     batch_result = pool.map(test_one_user, user_batch_rating_uid)
 

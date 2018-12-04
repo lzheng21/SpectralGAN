@@ -15,18 +15,20 @@ class Discriminator(object):
                                                                mean=0.01, stddev=0.02, dtype=tf.float32),
                                                                name='weight')
 
-        self.adj_miss = tf.placeholder(tf.int32, shape=[n_node, n_node])
+        #self.adj_miss = tf.placeholder(tf.int32, shape=[n_node, n_node])
+        self.eigen_vectors = tf.placeholder(tf.float32, shape=[self.n_node, config.n_eigs])
+        self.eigen_values = tf.placeholder(tf.float32, shape=[config.n_eigs])
         self.node_id = tf.placeholder(tf.int32, shape=[config.missing_edge*2])
         self.node_neighbor_id = tf.placeholder(tf.int32, shape=[config.missing_edge*2])
         self.label = tf.placeholder(tf.float32, shape=[config.missing_edge*2])
 
-        adj_miss = tf.cast(self.adj_miss, tf.float32)
-        degree = tf.diag(tf.reciprocal(tf.reduce_sum(adj_miss, axis=1)))
+        A_hat = tf.add(tf.matmul(self.eigen_vectors, tf.transpose(self.eigen_vectors)),
+                       tf.matmul(self.eigen_vectors, tf.matmul(tf.diag(self.eigen_values),
+                                                               tf.transpose(self.eigen_vectors))))
         for l in range(n_layer):
             weight_for_l = tf.gather(self.weight_matrix, l)
-            self.embedding_matrix = tf.nn.sigmoid(tf.matmul(tf.matmul(tf.matmul(degree, adj_miss),
-                                                        self.embedding_matrix),
-                                                   weight_for_l))
+            self.embedding_matrix = tf.nn.sigmoid(tf.matmul(tf.matmul(A_hat,self.embedding_matrix),
+                                                            weight_for_l))
 
         self.node_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_id)
         self.node_neighbor_embedding = tf.nn.embedding_lookup(self.embedding_matrix,

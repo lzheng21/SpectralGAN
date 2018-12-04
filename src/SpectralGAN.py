@@ -8,6 +8,7 @@ import random
 from src import load_data
 from src import utils
 from src import test
+from scipy.sparse import linalg
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 data = load_data.Data(train_file=config.train_filename, test_file=config.test_filename)
@@ -59,9 +60,10 @@ class SpectralGAN(object):
             for d_epoch in range(config.n_epochs_dis):
                 # generate new nodes for the discriminator for every dis_interval iterations
                 if d_epoch % config.dis_interval == 0:
-                    adj_missing, node_1, node_2, labels = self.prepare_data_for_d()
+                    eigen_vectors, eigen_values, node_1, node_2, labels = self.prepare_data_for_d()
                 self.sess.run(self.discriminator.d_updates,
-                              feed_dict={self.discriminator.adj_miss: np.array(adj_missing),
+                              feed_dict={self.discriminator.eigen_vectors: eigen_vectors,
+                                         self.discriminator.eigen_values: eigen_values,
                                          self.discriminator.node_id: np.array(node_1),
                                          self.discriminator.node_neighbor_id: np.array(node_2),
                                          self.discriminator.label: np.array(labels)})
@@ -73,10 +75,11 @@ class SpectralGAN(object):
             reward = []
             for g_epoch in range(config.n_epochs_gen):
                 if g_epoch % config.gen_interval == 0:
-                    adj_missing, node_1, node_2, reward = self.prepare_data_for_g()
+                    eigen_vectors, eigen_values, node_1, node_2, reward = self.prepare_data_for_g()
 
                 self.sess.run(self.generator.g_updates,
-                                feed_dict={self.generator.adj_miss: np.array(adj_missing),
+                                feed_dict={self.generator.eigen_vectors: eigen_vectors,
+                                           self.generator.eigen_values: eigen_values,
                                            self.generator.node_id: np.array(node_1),
                                            self.generator.node_neighbor_id: np.array(node_2),
                                            self.generator.reward: np.array(reward)})
@@ -103,8 +106,9 @@ class SpectralGAN(object):
         adj_missing = self.adj_mat(R=R_missing)
         node_2 = [self.n_users + p for p in pos_items]
 
-
-        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: adj_missing})
+        eigenvalues, eigenvectors = linalg.eigs(adj_missing, k=config.n_eigs)
+        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.eigen_vectors: eigenvectors,
+                                                                       self.generator.eigen_values: eigenvalues})
         negative_items = []
         for u in users:
             neg_items = list(set(range(self.n_items)) - set(np.nonzero(self.R[u, :])[0].tolist()))
@@ -118,7 +122,7 @@ class SpectralGAN(object):
         node_1 = users*2
         labels = [1.0]*config.missing_edge + [0.0] * config.missing_edge
 
-        return adj_missing, node_1, node_2, labels
+        return eigenvectors, eigenvalues, node_1, node_2, labels
 
     def prepare_data_for_g(self):
         """sample nodes for the generator"""
@@ -132,7 +136,10 @@ class SpectralGAN(object):
 
         adj_missing = self.adj_mat(R=R_missing)
 
-        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.adj_miss: adj_missing})
+        eigenvalues, eigenvectors = linalg.eigs(adj_missing, k=config.n_eigs)
+
+        all_score = self.sess.run(self.generator.all_score, feed_dict={self.generator.eigen_vectors: eigenvectors,
+                                                                       self.generator.eigen_values:   eigenvalues})
 
         negative_items = []
         for u in users:
@@ -146,10 +153,11 @@ class SpectralGAN(object):
         node_1 = users*2
         node_2 = negative_items*2
         reward = self.sess.run(self.discriminator.reward,
-                               feed_dict={self.discriminator.adj_miss: adj_missing,
+                               feed_dict={self.discriminator.eigen_vectors: eigenvectors,
+                                          self.discriminator.eigen_values: eigenvalues,
                                           self.discriminator.node_id: np.array(node_1),
                                           self.discriminator.node_neighbor_id: np.array(node_2)})
-        return adj_missing, node_1[:config.missing_edge], node_2[:config.missing_edge], reward[:config.missing_edge]
+        return eigenvectors, eigenvalues, node_1[:config.missing_edge], node_2[:config.missing_edge], reward[:config.missing_edge]
 
 
     def adj_mat(self, R, self_connection=True):

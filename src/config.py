@@ -24,6 +24,7 @@ emb_dim = 16
 multi_processing = False  # whether using multi-processing to construct BFS-trees
 missing_edge = 128
 n_layers = 3
+n_eigs = 6
 
 
 
