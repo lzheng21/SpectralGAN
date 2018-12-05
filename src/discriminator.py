@@ -25,13 +25,17 @@ class Discriminator(object):
         A_hat = tf.add(tf.matmul(self.eigen_vectors, tf.transpose(self.eigen_vectors)),
                        tf.matmul(self.eigen_vectors, tf.matmul(tf.diag(self.eigen_values),
                                                                tf.transpose(self.eigen_vectors))))
+
+        all_embeddings = [self.embedding_matrix]
         for l in range(n_layer):
             weight_for_l = tf.gather(self.weight_matrix, l)
-            self.embedding_matrix = tf.nn.sigmoid(tf.matmul(tf.matmul(A_hat,self.embedding_matrix),
+            embedding_matrix = tf.nn.sigmoid(tf.matmul(tf.matmul(A_hat,self.embedding_matrix),
                                                             weight_for_l))
+            all_embeddings.append(embedding_matrix)
 
-        self.node_embedding = tf.nn.embedding_lookup(self.embedding_matrix, self.node_id)
-        self.node_neighbor_embedding = tf.nn.embedding_lookup(self.embedding_matrix,
+        all_embeddings = tf.concat(all_embeddings, 1)
+        self.node_embedding = tf.nn.embedding_lookup(all_embeddings, self.node_id)
+        self.node_neighbor_embedding = tf.nn.embedding_lookup(all_embeddings,
                                                               self.node_neighbor_id)
         self.score = tf.reduce_sum(tf.multiply(self.node_embedding, self.node_neighbor_embedding), axis=1)
 

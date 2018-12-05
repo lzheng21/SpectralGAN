@@ -11,6 +11,7 @@ from src import test
 from scipy.sparse import linalg
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# os.environ["CUDA_VISIBLE_DEVICES"]= '0'
 data = load_data.Data(train_file=config.train_filename, test_file=config.test_filename)
 
 
@@ -57,33 +58,38 @@ class SpectralGAN(object):
             node_1 = []
             node_2 = []
             labels = []
+            losess = []
             for d_epoch in range(config.n_epochs_dis):
                 # generate new nodes for the discriminator for every dis_interval iterations
                 if d_epoch % config.dis_interval == 0:
                     eigen_vectors, eigen_values, node_1, node_2, labels = self.prepare_data_for_d()
-                self.sess.run(self.discriminator.d_updates,
+                _, loss = self.sess.run([self.discriminator.d_updates, self.discriminator.loss],
                               feed_dict={self.discriminator.eigen_vectors: eigen_vectors,
                                          self.discriminator.eigen_values: eigen_values,
                                          self.discriminator.node_id: np.array(node_1),
                                          self.discriminator.node_neighbor_id: np.array(node_2),
                                          self.discriminator.label: np.array(labels)})
+                losess.append(loss)
+            print("d_loss %f" % np.mean(np.asarray(losess)))
 
             # G-steps
             adj_missing = []
             node_1 = []
             node_2 = []
             reward = []
+            losess = []
             for g_epoch in range(config.n_epochs_gen):
                 if g_epoch % config.gen_interval == 0:
                     eigen_vectors, eigen_values, node_1, node_2, reward = self.prepare_data_for_g()
 
-                self.sess.run(self.generator.g_updates,
+                _, loss = self.sess.run([self.generator.g_updates, self.generator.loss],
                                 feed_dict={self.generator.eigen_vectors: eigen_vectors,
                                            self.generator.eigen_values: eigen_values,
                                            self.generator.node_id: np.array(node_1),
                                            self.generator.node_neighbor_id: np.array(node_2),
                                            self.generator.reward: np.array(reward)})
-
+                losess.append(loss)
+            print("g_loss %f" % np.mean(np.asarray(losess)))
             ret = test.test(sess=self.sess, model=self.generator, users_to_test=data.test_set.keys())
             print('recall_20 %f recall_40 %f recall_60 %f recall_80 %f recall_100 %f'
                   % (ret[0], ret[1], ret[2], ret[3], ret[4]))
