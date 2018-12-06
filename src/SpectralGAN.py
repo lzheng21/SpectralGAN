@@ -45,7 +45,7 @@ class SpectralGAN(object):
         """initializing the discriminator"""
 
         with tf.variable_scope("discriminator"):
-            self.discriminator = discriminator.Discriminator(n_node=self.n_node, n_layer=config.n_layers)
+            self.discriminator = discriminator.Discriminator(data=data, n_node=self.n_node, n_layer=config.n_layers)
 
     def train(self):
 
@@ -90,7 +90,7 @@ class SpectralGAN(object):
                                            self.generator.reward: np.array(reward)})
                 losess.append(loss)
             print("g_loss %f" % np.mean(np.asarray(losess)))
-            ret = test.test(sess=self.sess, model=self.generator, users_to_test=data.test_set.keys())
+            ret = test.test(sess=self.sess, model=self.discriminator, users_to_test=data.test_set.keys())
             print('recall_20 %f recall_40 %f recall_60 %f recall_80 %f recall_100 %f'
                   % (ret[0], ret[1], ret[2], ret[3], ret[4]))
             print('map_20 %f map_40 %f map_60 %f map_80 %f map_100 %f'

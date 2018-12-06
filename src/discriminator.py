@@ -1,10 +1,10 @@
 import tensorflow as tf
 from src import config
 
-
 class Discriminator(object):
-    def __init__(self, n_node, n_layer):
+    def __init__(self, data, n_node, n_layer):
         self.n_node = n_node
+        self.data = data
 
         with tf.variable_scope('discriminator'):
             self.embedding_matrix = tf.Variable(tf.random_normal([self.n_node, config.emb_dim],
@@ -44,6 +44,9 @@ class Discriminator(object):
                 tf.nn.sigmoid_cross_entropy_with_logits(labels=self.label, logits=self.score)) \
                 + config.lambda_dis * ( tf.nn.l2_loss(self.node_neighbor_embedding) +
                                                 tf.nn.l2_loss(self.node_embedding))
+
+        user_embeddings, item_embeddings = tf.split(all_embeddings, [self.data.n_users, self.data.n_items])
+        self.all_score = tf.matmul(user_embeddings, item_embeddings, transpose_b=True)
 
         optimizer = tf.train.AdamOptimizer(config.lr_dis)
         self.d_updates = optimizer.minimize(tf.reduce_mean(self.loss))
