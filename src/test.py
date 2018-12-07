@@ -61,8 +61,7 @@ def test(sess, model, users_to_test):
     pool = multiprocessing.Pool(cores)
     batch_size = config.batch_size_gen
     #all users needed to test
-    test_users = users_to_test
-    test_user_num = len(test_users)
+    test_user_num = len(users_to_test)
 
     A = np.zeros([data.n_users + data.n_items, data.n_users + data.n_items], dtype=np.float32)
     A[:data.n_users, data.n_users:] = data.R
@@ -70,9 +69,12 @@ def test(sess, model, users_to_test):
     A = np.identity(data.n_users + data.n_items, dtype=np.float32) + A
     eigenvalues, eigenvectors = linalg.eigs(A, k=config.n_eigs)
 
-    user_batch_rating = sess.run(model.all_score, feed_dict={model.eigen_vectors: eigenvectors,
+    user_ratings = sess.run(model.all_score, feed_dict={model.eigen_vectors: eigenvectors,
                                                              model.eigen_values: eigenvalues})
-    user_batch_rating_uid = zip(user_batch_rating, test_users)
+
+
+    user_batch_rating_uid = zip(np.take(user_ratings, users_to_test, axis=0).tolist(), users_to_test)
+
     batch_result = pool.map(test_one_user, user_batch_rating_uid)
 
 

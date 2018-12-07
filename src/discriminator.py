@@ -29,9 +29,9 @@ class Discriminator(object):
         all_embeddings = [self.embedding_matrix]
         for l in range(n_layer):
             weight_for_l = tf.gather(self.weight_matrix, l)
-            embedding_matrix = tf.nn.sigmoid(tf.matmul(tf.matmul(A_hat,self.embedding_matrix),
+            self.embedding_matrix = tf.nn.sigmoid(tf.matmul(tf.matmul(A_hat,self.embedding_matrix),
                                                             weight_for_l))
-            all_embeddings.append(embedding_matrix)
+            all_embeddings.append(self.embedding_matrix)
 
         all_embeddings = tf.concat(all_embeddings, 1)
         self.node_embedding = tf.nn.embedding_lookup(all_embeddings, self.node_id)
