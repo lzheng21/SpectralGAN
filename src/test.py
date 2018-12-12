@@ -85,3 +85,4 @@ def test(sess, model, users_to_test):
     ret = result / test_user_num
     ret = list(ret)
     return ret
+

@@ -14,6 +14,9 @@ class Generator(object):
             self.weight_matrix = tf.Variable(tf.random_normal([n_layer, config.emb_dim, config.emb_dim],
                                                                mean=0.01, stddev=0.02, dtype=tf.float32),
                                                                name='weight')
+            self.bias = tf.Variable(tf.random_normal([n_layer, config.emb_dim],
+                                                               mean=0.01, stddev=0.02, dtype=tf.float32),
+                                                               name='bias')
 
         #self.adj_miss = tf.placeholder(tf.int32, shape=[n_node, n_node])
         self.eigen_vectors = tf.placeholder(tf.float32, shape=[self.n_node, config.n_eigs])
@@ -31,14 +34,15 @@ class Generator(object):
 
         for l in range(n_layer):
             weight_for_l = tf.gather(self.weight_matrix, l)
-            self.embedding_matrix = tf.nn.sigmoid(tf.matmul(tf.matmul(A_hat,self.embedding_matrix),
-                                                  weight_for_l))
-            all_embeddings.append(self.embedding_matrix)
+            bias_for_l = tf.gather(self.bias, l)
+            embedding_matrix = tf.nn.sigmoid(tf.add(tf.matmul(tf.matmul(A_hat,self.embedding_matrix),
+                                                  weight_for_l), bias_for_l))
+            all_embeddings.append(embedding_matrix)
 
-        all_embeddings = tf.concat(all_embeddings, 1)
-        self.node_embedding = tf.nn.embedding_lookup(all_embeddings, self.node_id)  # batch_size * n_embed
+        self.all_embeddings = tf.concat(all_embeddings, 1)
+        self.node_embedding = tf.nn.embedding_lookup(self.all_embeddings, self.node_id)  # batch_size * n_embed
 
-        self.node_neighbor_embedding = tf.nn.embedding_lookup(all_embeddings,
+        self.node_neighbor_embedding = tf.nn.embedding_lookup(self.all_embeddings,
                                                               self.node_neighbor_id)
         self.score = tf.reduce_sum(self.node_embedding * self.node_neighbor_embedding, axis=1)
         self.prob = tf.clip_by_value(tf.nn.sigmoid(self.score), 1e-5, 1)
@@ -46,7 +50,7 @@ class Generator(object):
         self.loss = -tf.reduce_mean(tf.log(self.prob) * self.reward) + config.lambda_gen * (
                     tf.nn.l2_loss(self.node_neighbor_embedding) + tf.nn.l2_loss(self.node_embedding))
 
-        user_embeddings, item_embeddings = tf.split(all_embeddings, [data.n_users, data.n_items])
+        user_embeddings, item_embeddings = tf.split(self.all_embeddings, [data.n_users, data.n_items])
         self.all_score = tf.matmul(user_embeddings, item_embeddings, transpose_b=True)
 
         optimizer = tf.train.AdamOptimizer(config.lr_gen)

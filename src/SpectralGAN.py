@@ -23,6 +23,8 @@ class SpectralGAN(object):
         # construct graph
         self.R = R
         self.eigenvalues, self.eigenvectors = linalg.eigs(self.adj_mat(R=self.R), k=config.n_eigs)
+        self.eigenvalues = self.eigenvalues[:config.n_eigs]
+        self.eigenvectors = self.eigenvectors[:, :config.n_eigs]
 
         print("building GAN model...")
         self.discriminator = None
